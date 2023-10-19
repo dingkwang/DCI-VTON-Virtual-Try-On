@@ -29,3 +29,13 @@ dependencies:
     - kornia==0.6
     - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
     - -e git+https://github.com/openai/CLIP.git@main#egg=clip
+    - onnxruntime-gpu
+    - onnxruntime
+    - cv2box
+    - apstone
+    - numba
+    - onnx
+    - scipy
+    - carvekit
+    - Pillow
+    - tqdm

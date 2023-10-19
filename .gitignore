@@ -1,0 +1,5 @@
+external/openpose/models/face
+external/openpose/models/hand
+external/openpose/models/pose
+external/AI_power/pretrain_models
+external/detectron2/build
