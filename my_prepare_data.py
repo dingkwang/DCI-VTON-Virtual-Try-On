@@ -3,19 +3,17 @@ import os.path as osp
 import subprocess
 import glob
 import json
+import time
+import sys
+# Add the path to DensePose to the Python path.
+sys.path.append('external/detectron2/projects/DensePose')
 
 from pathlib import Path
-
-
 import numpy as np
 from cv2box import CVImage
 from PIL import Image, ImageDraw
 from tqdm import tqdm
 import fire 
-
-import sys
-# Add the path to DensePose to the Python path.
-sys.path.append('external/detectron2/projects/DensePose')
 
 from external.AI_power.seg_lib.cihp_pgn.cihp_pgn_api import load_cihp_model
 from external.detectron2.projects.DensePose.apply_net import predict_on_images
@@ -31,9 +29,9 @@ class Preprocess:
         self.openpose_json = osp.join(self.parent_dir, "openpose_json")
         
         self.cihp_model = None
-        self.cihp_mask_dir = osp.join(self.parent_dir, "cihp_mask_vis")
-        self.cihp_parsing_dir = osp.join(self.parent_dir, "cihp_parsing_maps") # also "image-parse-v3"
-        self.cihp_edge_dir = osp.join(self.parent_dir, "cihp_edge_maps")
+        self.cihp_mask_dir = osp.join(self.parent_dir, "cihp_mask_vis") # For visulization only
+        self.cihp_parsing_dir = osp.join(self.parent_dir, "cihp_parsing_maps") # also "image-parse-v3", used in human_agnostic
+        self.cihp_edge_dir = osp.join(self.parent_dir, "cihp_edge_maps") # not used. 
 
         self.densepose_dir = osp.join(self.parent_dir, "image-densepose")
 
@@ -57,7 +55,7 @@ class Preprocess:
         os.makedirs(self.openpose_image, exist_ok=True)
         os.makedirs(self.openpose_json, exist_ok=True)
         cmd = f"{bin_file} -model_folder {model_folder} --image_dir {self.model_image_dir}  --hand --disable_blending --display 0 --write_json {self.openpose_json} --write_images {self.openpose_image} --num_gpu 1 --num_gpu_start 0"
-        print(cmd)
+        print("run openpose inference\n ", cmd)
         try:
             # Note: shell=True can be a security hazard if untrusted input is passed. Ensure the command is safe and sanitized.
             output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, text=True)
@@ -67,18 +65,23 @@ class Preprocess:
             print(f"Error output: \n{e.output}")
 
     def run_human_parse(self):
+        print("Start human parse")
+        start = time.time()
         if self.cihp_model is None:
             self.cihp_model = load_cihp_model()
+        print(f"human parse model loading takes{time.time()-start}")
         os.makedirs(self.cihp_mask_dir, exist_ok=True)
         os.makedirs(self.cihp_edge_dir, exist_ok=True)
         os.makedirs(self.cihp_parsing_dir, exist_ok=True)
         for image in self.image_list:
             print("process image", image)
+            file_name = osp.basename(image).replace(".jpg", ".png")
             img_p = CVImage(image).bgr
             mask, parsing, edge = self.cihp_model.forward(img_p)
-            CVImage(mask).save(osp.join(self.cihp_mask_dir, osp.basename(image)))
-            CVImage(parsing).save(osp.join(self.cihp_parsing_dir, osp.basename(image)))
-            CVImage(edge).save(osp.join(self.cihp_edge_dir, osp.basename(image)))
+            CVImage(mask).save(osp.join(self.cihp_mask_dir, file_name)) # for vis only
+            CVImage(parsing).save(osp.join(self.cihp_parsing_dir, file_name))
+            CVImage(edge).save(osp.join(self.cihp_edge_dir, file_name))
+        print(f"Human parse done, takes {time.time()-start}")
 
     def run_densepose(self):
         dense_pose_image_list = [osp.join(self.densepose_dir, osp.basename(image_file)) for image_file in self.image_list]
@@ -161,6 +164,7 @@ class Preprocess:
                 continue
             # load parsing image
             # parse_name = osp.basename(img_file).replace('.jpg', '.png')
+            parse_name = osp.basename(img_file)
             im_parse = Image.open(osp.join(self.cihp_parsing_dir, parse_name)) 
             agnostic_img = get_im_parse_agnostic(im_parse, pose_data)
             agnostic_img.save(osp.join(self.image_parse_agnostic_dir , parse_name))
@@ -189,9 +193,8 @@ class Preprocess:
 
             # load parsing image
             im = Image.open(img_file)
-            label_name = img_file.replace('.jpg', '.png')
-            im_label = Image.open(
-                osp.join(self.cihp_parsing_dir, label_name))
+            label_name = osp.basename(img_file)
+            im_label = Image.open(osp.join(self.cihp_parsing_dir, label_name))
             agnostic_img = get_human_agnostic(im, im_label, pose_data)
             agnostic_img.save(osp.join(self.human_agnostic_dir, osp.basename(img_file)))
 
