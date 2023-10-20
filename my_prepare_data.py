@@ -45,6 +45,8 @@ class Preprocess:
         """
         Use openpose to generate human pose with hand.
         """
+        print("start open pose")
+        start = time.time()
         bin_file = "external/openpose/build/examples/openpose/openpose.bin"
         model_file = "external/openpose/models/pose"
         model_folder = "external/openpose/models"
@@ -63,6 +65,8 @@ class Preprocess:
         except subprocess.CalledProcessError as e:
             print(f"An error occurred: \n{str(e)}")
             print(f"Error output: \n{e.output}")
+        
+        print(f"Openpose done, takes {time.time()-start}")
 
     def run_human_parse(self):
         print("Start human parse")
@@ -84,6 +88,8 @@ class Preprocess:
         print(f"Human parse done, takes {time.time()-start}")
 
     def run_densepose(self):
+        print("start Dense pose")
+        start = time.time()
         dense_pose_image_list = [osp.join(self.densepose_dir, osp.basename(image_file)) for image_file in self.image_list]
         predict_on_images(
             config_fpath="external/detectron2/projects/DensePose/configs/densepose_rcnn_R_50_FPN_s1x.yaml",
@@ -91,7 +97,7 @@ class Preprocess:
             image_file_list=self.image_list,
             output_file_list=dense_pose_image_list
         )
-        print("Densepose completed.")
+        print(f"Dense pose done, takes {time.time()-start}")
         
     def run_clothmask(self):
         """
@@ -112,6 +118,8 @@ class Preprocess:
             from carvekit.ml.files.models_loc import download_all
             print("Downloading clothmask models.")
             download_all()
+        print("start clothmask")
+        start = time.time()
 
         SHOW_FULLSIZE = False #param {type:"boolean"}
         PREPROCESSING_METHOD = "none" #param ["stub", "none"]
@@ -144,6 +152,7 @@ class Preprocess:
             im = Image.fromarray(np.uint8(img), 'L')
             output_file = osp.join(self.cloth_mask_dir, osp.basename(input_image_file))
             im.save(output_file)
+        print(f"Clothmask done, takes {time.time()-start}")
 
     def parse_agnostic(self):
         """
@@ -197,6 +206,8 @@ class Preprocess:
             im_label = Image.open(osp.join(self.cihp_parsing_dir, label_name))
             agnostic_img = get_human_agnostic(im, im_label, pose_data)
             agnostic_img.save(osp.join(self.human_agnostic_dir, osp.basename(img_file)))
+
+
 
 
 def get_human_agnostic(img, parse, pose_data):
